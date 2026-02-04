@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Birthday Flower Tree ✨</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+
+<style>
+body{
+    margin:0;
+    padding:0;
+    background:#050505;
+    overflow:hidden;
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Text animation */
+#text-container{
+    position:absolute;
+    left:50px;
+    top:30%;
+    width:360px;
+    font-size:22px;
+    line-height:1.6;
+    opacity:0;
+    animation: slideFade 2.5s ease forwards;
+    animation-delay:2.5s;
+    text-shadow:0 0 15px rgba(255,105,180,.6);
+    color:white;
+}
+
+@keyframes slideFade{
+    from{ opacity:0; transform:translateY(30px); }
+    to{ opacity:1; transform:translateY(0); }
+}
+
+.cursor{
+    display:inline-block;
+    width:10px;
+    background:#ff69b4;
+    animation: blink .7s infinite;
+}
+
+@keyframes blink{
+    0%,100%{opacity:0}
+    50%{opacity:1}
+}
+
+canvas{ display:block; }
+</style>
+</head>
+
+<body>
+
+<div id="text-container">
+    <div id="typed-text"></div>
+    <span class="cursor">_</span>
+</div>
+
+<script>
+let tree=[], flowers=[], sparkles=[], petals=[];
+let drop;
+let state="DROP";
+let count=0;
+let maxGenerations=9; // Taller tree 🌳
+
+const messages=[
+    "Hey you 💕",
+    "Happy Birthday 🎂",
+    "A tiny drop of love…",
+    "Grows into something magical ✨",
+    "You light up lives 🌟",
+    "Never stop blooming 🌸"
+];
+
+let lineIndex=0, charIndex=0;
+
+function setup(){
+    createCanvas(windowWidth, windowHeight);
+
+    drop={
+        x: width/2 + 200,
+        y:-80,
+        speed:4,
+        size:22
+    };
+
+    for(let i=0;i<30;i++){
+        petals.push(new Petal());
+    }
+}
+
+function draw(){
+    background(5,5,5,40);
+
+    drawPetals();
+
+    if(state==="DROP") drawDrop();
+    else renderTree();
+}
+
+/* Water drop entry */
+function drawDrop(){
+    noStroke();
+    fill(255,105,180);
+    beginShape();
+    vertex(drop.x,drop.y);
+    bezierVertex(drop.x-18,drop.y+25,drop.x+18,drop.y+25,drop.x,drop.y);
+    ellipse(drop.x,drop.y+18,20,26);
+    endShape();
+
+    drop.y+=drop.speed;
+    drop.speed+=0.18;
+
+    if(drop.y>height-30){
+        state="GROWING";
+        startTree();
+        type();
+    }
+}
+
+/* Tree */
+function startTree(){
+    let a=createVector(width/2+200,height);
+    let b=createVector(width/2+200,height-160);
+    tree.push(new Branch(a,b,12));
+}
+
+function renderTree(){
+    for(let b of tree) b.show();
+    for(let f of flowers) f.display();
+    for(let s of sparkles) s.update();
+
+    if(frameCount%22===0 && count<maxGenerations){
+        let newBranches=[];
+        for(let b of tree){
+            if(!b.finished){
+                newBranches.push(b.branch(random(PI/8,PI/5)));
+                newBranches.push(b.branch(-random(PI/8,PI/4)));
+                b.finished=true;
+            }
+        }
+        tree=tree.concat(newBranches);
+        count++;
+
+        if(count===maxGenerations) generateFlowers();
+    }
+}
+
+function generateFlowers(){
+    for(let b of tree){
+        if(random()<0.35){
+            flowers.push(new Flower(b.end));
+            sparkles.push(new Sparkle(b.end.x,b.end.y));
+        }
+    }
+}
+
+/* Branch class */
+function Branch(begin,end,w){
+    this.begin=begin;
+    this.end=end;
+    this.weight=w;
+    this.finished=false;
+
+    this.show=function(){
+        stroke(80,50,30);
+        strokeWeight(this.weight);
+        drawingContext.shadowBlur=10;
+        drawingContext.shadowColor="rgba(255,200,200,0.15)";
+        line(this.begin.x,this.begin.y,this.end.x,this.end.y);
+        drawingContext.shadowBlur=0;
+    }
+
+    this.branch=function(angle){
+        let dir=p5.Vector.sub(this.end,this.begin);
+        dir.rotate(angle);
+        dir.mult(0.78);
+        return new Branch(this.end,p5.Vector.add(this.end,dir),this.weight*0.7);
+    }
+}
+
+/* Flower sparkle */
+function Flower(pos){
+    this.x=pos.x+random(-6,6);
+    this.y=pos.y+random(-6,6);
+    this.size=random(10,16);
+    this.pulse=random(TWO_PI);
+    this.col=color(random(['#ff69b4','#ff85a2','#fbb1bd','#ffd6e0','#9b5de5']));
+
+    this.display=function(){
+        this.pulse+=0.05;
+        let glow=map(sin(this.pulse),-1,1,0,12);
+
+        drawingContext.shadowBlur=glow;
+        drawingContext.shadowColor=this.col;
+
+        noStroke();
+        fill(this.col);
+        for(let i=0;i<5;i++){ 
+            push();
+            translate(this.x,this.y);
+            rotate(TWO_PI*i/5);
+            ellipse(0,this.size/2,this.size/2,this.size);
+            pop();
+        }
+        fill(255);
+        circle(this.x,this.y,this.size/4);
+        drawingContext.shadowBlur=0;
+    }
+}
+
+/* Sparkle particles */
+function Sparkle(x,y){
+    this.x=x;
+    this.y=y;
+    this.life=random(60,120);
+
+    this.update=function(){
+        if(this.life>0){
+            this.life--;
+            fill(255,200,255,random(80,150));
+            noStroke();
+            circle(this.x+random(-10,10),this.y+random(-10,10),random(1,3));
+        }
+    }
+}
+
+/* Floating petals */
+function Petal(){
+    this.x=random(width);
+    this.y=random(height);
+    this.speed=random(0.3,1);
+
+    this.update=function(){
+        this.y+=this.speed;
+        this.x+=sin(frameCount*0.01)*0.5;
+        if(this.y>height){ this.y=0; this.x=random(width); }
+        fill(255,105,180,60);
+        noStroke();
+        ellipse(this.x,this.y,6,10);
+    }
+}
+
+function drawPetals(){
+    for(let p of petals) p.update();
+}
+
+/* Typing text */
+function type(){
+    const t=document.getElementById("typed-text");
+    if(lineIndex<messages.length){
+        if(charIndex<messages[lineIndex].length){
+            t.innerHTML+=messages[lineIndex][charIndex++];
+            setTimeout(type,75);
+        }else{
+            t.innerHTML+="<br>";
+            charIndex=0;
+            lineIndex++;
+            setTimeout(type,900);
+        }
+    }
+}
+
+function windowResized(){
+    resizeCanvas(windowWidth,windowHeight);
+}
+</script>
+</body>
+</html>
