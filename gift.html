@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Glittering Tree</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #020205;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            font-family: 'Georgia', serif;
+            overflow: hidden;
+        }
+
+        #text-container {
+            position: absolute;
+            left: 80px;
+            top: 30%;
+            width: 400px;
+            z-index: 100;
+            line-height: 1.8;
+            font-size: 22px;
+            pointer-events: none; /* Allows mouse to "pass through" to canvas */
+        }
+
+        .typing-line {
+            background: linear-gradient(90deg, #ff69b4, #ffffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 5px rgba(255, 105, 180, 0.5));
+        }
+
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+    <div id="text-container"></div>
+
+    <script>
+        let tree = [];
+        let flowers = [];
+        let sparkles = [];
+        let drop;
+        let state = "DROP"; 
+        let count = 0;
+        let maxGenerations = 9; 
+
+        const messages = [
+            "Every heart has a story... ✨",
+            "But yours is my favorite.",
+            "Happy Birthday to someone special 💖",
+            "Move your mouse to create magic...",
+            "Sending you infinite love 🌸"
+        ];
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            // Drop starts at top, slightly right of center
+            drop = { x: width / 2 + 200, y: -50, vy: 2, ay: 0.15 };
+        }
+
+        function draw() {
+            background(2, 2, 5, 40); // Motion blur
+
+            // 1. MOUSE INTERACTION: Create sparkles on move
+            if (mouseX > 0 && mouseY > 0) {
+                for (let i = 0; i < 2; i++) {
+                    sparkles.push(new Sparkle(mouseX, mouseY, true));
+                }
+            }
+
+            // 2. STATE LOGIC
+            if (state === "DROP") {
+                updateDrop();
+            } else {
+                renderTree();
+            }
+
+            // 3. RENDER ALL SPARKLES
+            updateSparkles();
+        }
+
+        function updateDrop() {
+            noStroke();
+            fill(255, 105, 180);
+            drawingContext.shadowBlur = 20;
+            drawingContext.shadowColor = '#ff69b4';
+            ellipse(drop.x, drop.y, 15, 20);
+            
+            // Drop trail
+            sparkles.push(new Sparkle(drop.x, drop.y, false));
+
+            drop.y += drop.vy;
+            drop.vy += drop.ay;
+
+            if (drop.y > height - 10) {
+                state = "GROW";
+                startTree();
+                startTyping();
+            }
+        }
+
+        function startTree() {
+            let a = createVector(width / 2 + 200, height);
+            let b = createVector(width / 2 + 200, height - 140);
+            tree.push(new Branch(a, b, 12));
+        }
+
+        function renderTree() {
+            for (let b of tree) b.show();
+            for (let f of flowers) f.display();
+
+            if (frameCount % 15 == 0 && count < maxGenerations) {
+                for (let i = tree.length - 1; i >= 0; i--) {
+                    if (!tree[i].finished) {
+                        tree.push(tree[i].branch(random(PI/8, PI/5)));
+                        tree.push(tree[i].branch(-random(PI/10, PI/4)));
+                    }
+                    tree[i].finished = true;
+                }
+                count++;
+                if (count === maxGenerations) generateFlowers();
+            }
+        }
+
+        // --- CLASSES ---
+
+        function Branch(begin, end, w) {
+            this.begin = begin;
+            this.end = end;
+            this.w = w;
+            this.finished = false;
+            this.show = function() {
+                stroke(60, 35, 25);
+                strokeWeight(this.w);
+                line(this.begin.x, this.begin.y, this.end.x, this.end.y);
+            }
+            this.branch = function(angle) {
+                let dir = p5.Vector.sub(this.end, this.begin);
+                dir.rotate(angle);
+                dir.mult(0.78);
+                return new Branch(this.end, p5.Vector.add(this.end, dir), this.w * 0.7);
+            }
+        }
+
+        function Flower(pos) {
+            this.pos = pos.copy();
+            this.size = random(6, 14);
+            this.color = color(random(['#ff007f', '#ff85a2', '#7209b7', '#f72585', '#fee440']));
+            this.display = function() {
+                let glow = sin(frameCount * 0.1) * 10;
+                fill(this.color);
+                noStroke();
+                drawingContext.shadowBlur = 15 + glow;
+                drawingContext.shadowColor = this.color.toString();
+                push();
+                translate(this.pos.x, this.pos.y);
+                for (let i = 0; i < 6; i++) {
+                    rotate(PI / 3);
+                    ellipse(0, this.size/1.5, this.size/2, this.size);
+                }
+                pop();
+            }
+        }
+
+        function Sparkle(x, y, isMouse) {
+            this.x = x + random(-10, 10);
+            this.y = y + random(-10, 10);
+            this.vx = random(-1, 1);
+            this.vy = random(-1, 1);
+            this.alpha = 255;
+            // Mouse sparkles are Pink/White, Drop sparkles are Pink
+            this.col = isMouse ? random(['#ff69b4', '#ffffff', '#ff1493']) : '#ffb6c1';
+
+            this.update = function() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 5; 
+            }
+
+            this.show = function() {
+                noStroke();
+                let c = color(this.col);
+                c.setAlpha(this.alpha);
+                fill(c);
+                drawingContext.shadowBlur = 5;
+                drawingContext.shadowColor = this.col;
+                circle(this.x, this.y, random(1, 4));
+            }
+        }
+
+        function updateSparkles() {
+            for (let i = sparkles.length - 1; i >= 0; i--) {
+                sparkles[i].update();
+                sparkles[i].show();
+                if (sparkles[i].alpha <= 0) sparkles.splice(i, 1);
+            }
+        }
+
+        function generateFlowers() {
+            for (let b of tree) if (random(1) > 0.4) flowers.push(new Flower(b.end));
+        }
+
+        async function startTyping() {
+            const container = document.getElementById('text-container');
+            for (let msg of messages) {
+                let div = document.createElement('div');
+                div.className = 'typing-line';
+                container.appendChild(div);
+                for (let char of msg) {
+                    div.innerHTML += char;
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
+        function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+    </script>
+</body>
+</html>
