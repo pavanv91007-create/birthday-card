@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Happy Birthday!</title>
+  <style>
+    :root{
+      --bg1:#ffecd2;
+      --bg2:#fcb69f;
+      --card-bg: rgba(255,255,255,0.95);
+      --accent:#ff7ab6;
+      --muted:#5b5b5b;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{
+      background: linear-gradient(135deg,var(--bg1),var(--bg2));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+
+    .container{width:100%;max-width:980px}
+
+    .card{
+      background:var(--card-bg);
+      border-radius:18px;
+      padding:28px;
+      box-shadow:0 8px 30px rgba(0,0,0,0.12);
+      position:relative;
+      overflow:hidden;
+    }
+
+    .header h1{
+      margin:0;
+      font-size:2.2rem;
+      letter-spacing:0.4px;
+      color:#333;
+    }
+    .subtitle{margin:6px 0 18px;color:var(--muted)}
+
+    .controls{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      margin-bottom:14px;
+      flex-wrap:wrap;
+    }
+    .controls input[type="text"]{
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid rgba(0,0,0,0.08);
+      font-size:1rem;
+      min-width:220px;
+    }
+    .controls button{
+      background:linear-gradient(180deg,var(--accent),#ff5fa0);
+      border:none;
+      color:white;
+      padding:10px 16px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+      box-shadow:0 6px 18px rgba(255,122,166,0.22);
+    }
+    .controls button:active{transform:translateY(1px)}
+    .audio-label{font-size:0.92rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+
+    .scene{
+      position:relative;
+      min-height:360px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      padding-top:10px;
+    }
+
+    /* cake and message */
+    .cake{font-size:4.2rem; filter:drop-shadow(0 6px 18px rgba(0,0,0,0.08))}
+    .message{
+      margin-top:12px;
+      font-size:1.1rem;
+      color:#222;
+      text-align:center;
+      max-width:70%;
+      line-height:1.35;
+      word-wrap:break-word;
+    }
+
+    /* balloons */
+    .balloons{position:absolute;right:22px;top:18px;display:flex;flex-direction:column;gap:8px}
+    .balloon{font-size:2rem; transform-origin:50% 100%; animation:float 4s ease-in-out infinite}
+    .balloon.b2{animation-duration:4.8s; font-size:1.8rem}
+    .balloon.b3{animation-duration:5.6s; font-size:2.2rem}
+
+    @keyframes float{
+      0%{transform:translateY(0) rotate(-6deg)}
+      50%{transform:translateY(-18px) rotate(6deg)}
+      100%{transform:translateY(0) rotate(-6deg)}
+    }
+
+    /* canvas full size inside card */
+    #confettiCanvas{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      width:100%;
+      height:100%;
+    }
+
+    /* small helpers */
+    .footer-note{margin-top:12px;color:var(--muted);font-size:0.85rem;text-align:center}
+
+    /* Responsive tweaks */
+    @media (max-width:520px){
+      .message{max-width:90%;font-size:1rem}
+      .controls{flex-direction:column;align-items:stretch}
+      .balloons{right:12px;top:8px}
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <div class="card" id="card">
+      <div class="header">
+        <h1 id="greeting">Happy Birthday!</h1>
+        <p class="subtitle">Add a name and press Surprise!</p>
+      </div>
+
+      <div class="controls">
+        <input id="nameInput" type="text" placeholder="Enter their name (optional)" aria-label="Name" />
+        <button id="surpriseBtn" aria-label="Surprise">Surprise!</button>
+        <label class="audio-label">
+          <input id="musicToggle" type="checkbox" />
+          Play music
+        </label>
+      </div>
+
+      <div class="scene" role="region" aria-label="Birthday scene">
+        <div class="cake" aria-hidden="true">🎂</div>
+        <div class="message" id="message">Wishing you a day filled with love and joy 🎉</div>
+        <div class="balloons" aria-hidden="true">
+          <div class="balloon b1">🎈</div>
+          <div class="balloon b2">🎈</div>
+          <div class="balloon b3">🎈</div>
+        </div>
+        <canvas id="confettiCanvas" aria-hidden="true"></canvas>
+      </div>
+
+      <p class="footer-note">Tip: add a local file named <code>happy-birthday.mp3</code> in the same folder, or change the audio source in the HTML below.</p>
+    </div>
+  </main>
+
+  <!-- Optional: replace src with your own audio file or a hosted URL -->
+  <audio id="bgMusic" src="happy-birthday.mp3" preload="auto"></audio>
+
+  <script>
+    // Single-file birthday card: confetti, personalized greeting, optional music
+    (function () {
+      const nameInput = document.getElementById('nameInput');
+      const surpriseBtn = document.getElementById('surpriseBtn');
+      const greeting = document.getElementById('greeting');
+      const message = document.getElementById('message');
+      const canvas = document.getElementById('confettiCanvas');
+      const musicToggle = document.getElementById('musicToggle');
+      const bgMusic = document.getElementById('bgMusic');
+
+      // Canvas setup (handle DPR for crispness)
+      const ctx = canvas.getContext('2d');
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        // If rect width/height are 0 (not yet laid out), set a fallback.
+        const w = rect.width || canvas.clientWidth || 800;
+        const h = rect.height || canvas.clientHeight || 400;
+        canvas.width = Math.max(1, Math.floor(w * dpr));
+        canvas.height = Math.max(1, Math.floor(h * dpr));
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener('resize', resizeCanvas);
+      // run after paint to ensure sizes are calculated
+      requestAnimationFrame(resizeCanvas);
+
+      // Confetti particle system
+      const colors = ['#FF5A5F','#FFB400','#7BD389','#5AA9E6','#C77DFF','#FF7AB6'];
+      const particles = [];
+      let running = false;
+
+      function rand(min, max){ return Math.random()*(max-min)+min; }
+
+      function createBurst(x, y, count=80) {
+        // x,y in canvas coordinate space (CSS pixels)
+        for(let i=0;i<count;i++){
+          const angle = rand(-Math.PI, 0);
+          const speed = rand(1.5, 8);
+          particles.push({
+            x, y,
+            vx: Math.cos(angle)*speed,
+            vy: Math.sin(angle)*speed - rand(1,4),
+            size: rand(6, 12),
+            color: colors[Math.floor(Math.random()*colors.length)],
+            rotation: rand(0, Math.PI*2),
+            rotateSpeed: rand(-0.2,0.2),
+            ttl: rand(70, 140),
+            life: 0,
+            gravity: 0.12 + Math.random()*0.06,
+            drag: 0.99
+          });
+        }
+        if(!running) { running = true; requestAnimationFrame(loop); }
+      }
+
+      function loop(){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        // update and draw
+        for(let i = particles.length -1; i >= 0; i--){
+          const p = particles[i];
+          p.life++;
+          p.vy += p.gravity;
+          p.vx *= p.drag;
+          p.vy *= p.drag;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rotation += p.rotateSpeed;
+
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation);
+          ctx.fillStyle = p.color;
+          // draw as small rectangle (looks like confetti)
+          ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size*0.6);
+          ctx.restore();
+
+          if(p.life > p.ttl || p.y > canvas.height / (window.devicePixelRatio || 1) + 60){
+            particles.splice(i,1);
+          }
+        }
+
+        if(particles.length) requestAnimationFrame(loop);
+        else running = false;
+      }
+
+      // Simple typewriter reveal for message
+      function typeWriter(el, text, speed=30){
+        el.textContent = '';
+        let i = 0;
+        const id = setInterval(()=> {
+          el.textContent += text.charAt(i);
+          i++;
+          if(i >= text.length) clearInterval(id);
+        }, speed);
+      }
+
+      surpriseBtn.addEventListener('click', () => {
+        // set greeting
+        const name = nameInput.value.trim();
+        greeting.textContent = name ? `Happy Birthday, ${name}!` : 'Happy Birthday!';
+        // change message
+        const newMsg = name ? `Wishing you a wonderful year ahead, ${name}! 🎉` : 'Wishing you a wonderful year ahead! 🎉';
+        typeWriter(message, newMsg, 20);
+
+        // optionally play music if user checked the box
+        if(musicToggle.checked){
+          // try to play (this click is a user gesture)
+          bgMusic.currentTime = 0;
+          bgMusic.play().catch(()=>{ /* ignore play failure */ });
+        } else {
+          bgMusic.pause();
+        }
+
+        // confetti burst from around the cake center
+        // compute center relative to canvas CSS pixels
+        const rect = canvas.getBoundingClientRect();
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        createBurst(cx, cy, 110);
+        // additional waves for fullness
+        setTimeout(()=> createBurst(cx*0.6, cy*0.4, 50), 240);
+        setTimeout(()=> createBurst(cx*1.3, cy*0.45, 50), 340);
+      });
+
+      // Stop music when toggle is unchecked
+      musicToggle.addEventListener('change', () => {
+        if(!musicToggle.checked) bgMusic.pause();
+      });
+
+      // Initialize with friendly example message (fast reveal)
+      typeWriter(message, message.textContent, 5);
+
+      // Accessibility: allow Enter key on name input to trigger surprise
+      nameInput.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter') {
+          surpriseBtn.click();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
